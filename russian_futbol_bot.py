@@ -45,7 +45,8 @@ def statistic(bot, context):
                      ["Назад"]]
     markup_stat = ReplyKeyboardMarkup(keyboard_stat, one_time_keyboard=True)
     bot.message.reply_text(
-        "Я могу предоставить тебе доступ к такой статистике:", reply_markup=markup_stat)
+        "Я могу предоставить тебе доступ к следующей статистике... \n "
+        "Статистика обновляется после каждого тура", reply_markup=markup_stat)
 
 
 def news(bot, context):
@@ -106,7 +107,50 @@ def goals(bot, context):
 
 def info(bot, context):
     bot.message.reply_text(
-        "will be soon")
+        "В этом блоке вы можете узнать конкретнее о каждом "
+        "клубе выступающем в Тинькофф Российской Премьер Лиге \n "
+        "Выберите клуб:")
+    clubs = open('all_clubs.txt', 'r', encoding='utf-8').read()
+    bot.message.reply_text(f'{clubs}')
+    return 1
+
+
+def choose_club(bot, context):
+    clubs = open('all_clubs.txt', 'r', encoding='utf-8').readlines()
+    for i in range(len(clubs)):
+        clubs[i] = clubs[i].rstrip()
+    if bot.message.text in clubs:
+        context.user_data['club'] = bot.message.text
+        close_keyboard(bot, context)
+        keyboard_info = [["История", "Стадион"],
+                         ['Трофеи', 'Состав'],
+                         ["Обратно"]]
+        markup_info = ReplyKeyboardMarkup(keyboard_info, one_time_keyboard=True)
+        bot.message.reply_text('Команда "{}" выбрана'.format(bot.message.text),
+                               reply_markup=markup_info)
+        return 2
+    else:
+        bot.message.reply_text("Неверно введено название команды. Попробуйте еще раз.")
+        return 1
+
+
+def info_about_current_club(bot, context):
+    ru = ["История", "Стадион", 'Состав', 'Трофеи']
+    if bot.message.text in ru:
+        con = sqlite3.connect('clubs.db')
+        cur = con.cursor()
+        result = cur.execute("""SELECT * FROM all_clubs WHERE team == ?""",
+                             [context.user_data['club']]).fetchone()
+        otevt = list(result)[ru.index(bot.message.text) + 1].split('???')
+        if len(otevt) == 2:
+            foto = 'images/' + otevt[1]
+            context.bot.send_photo(chat_id=bot.message.chat.id, photo=open(foto, 'rb'))
+        otevt = otevt[0]
+        bot.message.reply_text(f'{otevt}')
+        return 2
+    else:
+        start(bot, context)
+    return ConversationHandler.END
 
 
 def vopros1(bot, context):
@@ -145,15 +189,23 @@ def main():
     dp.add_handler(MessageHandler(Filters.regex("Разработчикам"), developers))
     dp.add_handler(CommandHandler("statistic", statistic))
     dp.add_handler(CommandHandler("social_media", social_media))
-    conv_handler = ConversationHandler(
+    vopros = ConversationHandler(
         entry_points=[MessageHandler(Filters.regex("Обратная связь"), vopros1)],
         states={
             1: [MessageHandler(Filters.text & ~Filters.command, accept_vopros)]
         },
         fallbacks=[CommandHandler('ok', start)]
     )
-
-    dp.add_handler(conv_handler)
+    info_about_clubs = ConversationHandler(
+        entry_points=[MessageHandler(Filters.regex("Информация"), info, pass_user_data=True)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, choose_club)],
+            2: [MessageHandler(Filters.text & ~Filters.command, info_about_current_club)]
+        },
+        fallbacks=[CommandHandler('ok', start)]
+    )
+    dp.add_handler(info_about_clubs)
+    dp.add_handler(vopros)
     dp.add_handler(text_handler)
     my_bot.start_polling()
 
