@@ -1,10 +1,9 @@
-from flask import Flask, render_template
+from flask import Flask
 import logging
 import sqlite3
 from telegram.ext import MessageHandler, Filters
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, ConversationHandler, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, ConversationHandler
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG
@@ -12,8 +11,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 reply_keyboard = [['Новости', 'Статистика'],
-                  ['Разработчикам', 'Информация'],
-                  ['------']]
+                  ['Разработчикам', 'Информация']]
 
 TOKEN = '5193054775:AAHmmNiMl5903TX_C8Wk9Xp6fJ2REQVvdyE'
 
@@ -32,7 +30,7 @@ def start(bot, context):
 
 def close_keyboard(bot, context):
     bot.message.reply_text(
-        "Клвиатура изменена",
+        "Клавиатура изменена",
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -50,30 +48,32 @@ def statistic(bot, context):
 
 
 def news(bot, context):
-    keyboard = [
-        [
-            InlineKeyboardButton('Матч Премьер', callback_data='Матч Премьер'),
-            InlineKeyboardButton("tg2", callback_data='2'),
-        ],
-        [InlineKeyboardButton("tg 3", callback_data='3')],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    close_keyboard(bot, context)
+    keyboard_news = [['tg: Матч Премьер'], ['tg: Сборная России по футболу'],
+                     ['сайт: Чемпионат'], ['сайт: Спорт-Экспресс']]
+    markup_news = ReplyKeyboardMarkup(keyboard_news, one_time_keyboard=True)
 
     bot.message.reply_text(
-        'Итак тут ты можешь узнать последние новости о нашем футболе. Выбери Телеграм канал, '
-        'а я 10 последних новостей)', reply_markup=reply_markup)
+        'Итак тут ты можешь узнать последние новости о нашем футболе. Выбери СМИ,'
+        ' а я дам тебе на них ссылку канал,)', reply_markup=markup_news)
+    return 1
+
+
+def get_last_news(bot, context):
+    smi = ['tg: Матч Премьер', 'tg: Сборная России по футболу', 'сайт: Чемпионат',
+           'сайт: Спорт-Экспресс']
+    if bot.message.text in smi:
+        smi_link = open('news.txt', 'r', encoding='utf-8').readlines()
+        bot.message.reply_text(f"Ссылка: {smi_link[smi.index(bot.message.text)]}")
+        return ConversationHandler.END
+    else:
+        return 1
 
 
 def developers(bot, context):
     bot.message.reply_text("Хочешь оставить для нас послание/пожелание/предложение/похвалу? \n"
                            "Сеня - https://t.me/molnia_macvin \n"
                            "Или напиши: <Обратная связь> ")
-
-
-def social_media(bot, context):
-    bot.message.reply_text(
-        "will be soon")
 
 
 def table_rpl(bot, context):
@@ -178,7 +178,6 @@ def main():
     text_handler = MessageHandler(Filters.text & ~Filters.command, start)
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.regex("Статистика"), statistic))
-    dp.add_handler(MessageHandler(Filters.regex("Новости"), news))
     dp.add_handler(MessageHandler(Filters.regex("Турнирная таблица"), table_rpl))
     dp.add_handler(MessageHandler(Filters.regex("Бомбардиры"), goals))
     dp.add_handler(MessageHandler(Filters.regex("Голевые передачи"), assists))
@@ -188,7 +187,6 @@ def main():
     dp.add_handler(MessageHandler(Filters.regex("Назад"), start))
     dp.add_handler(MessageHandler(Filters.regex("Разработчикам"), developers))
     dp.add_handler(CommandHandler("statistic", statistic))
-    dp.add_handler(CommandHandler("social_media", social_media))
     vopros = ConversationHandler(
         entry_points=[MessageHandler(Filters.regex("Обратная связь"), vopros1)],
         states={
@@ -204,6 +202,14 @@ def main():
         },
         fallbacks=[CommandHandler('ok', start)]
     )
+    novosty = ConversationHandler(
+        entry_points=[MessageHandler(Filters.regex("Новости"), news, pass_user_data=True)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, get_last_news)],
+        },
+        fallbacks=[CommandHandler('ok', start)]
+    )
+    dp.add_handler(novosty)
     dp.add_handler(info_about_clubs)
     dp.add_handler(vopros)
     dp.add_handler(text_handler)
