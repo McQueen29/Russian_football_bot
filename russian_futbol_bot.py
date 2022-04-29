@@ -1,4 +1,3 @@
-from flask import Flask
 import logging
 import sqlite3
 from telegram.ext import MessageHandler, Filters
@@ -14,8 +13,6 @@ reply_keyboard = [['Новости', 'Статистика'],
                   ['Разработчикам', 'Информация']]
 
 TOKEN = '5193054775:AAHmmNiMl5903TX_C8Wk9Xp6fJ2REQVvdyE'
-
-app = Flask(__name__)
 
 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False)
 
@@ -50,7 +47,8 @@ def statistic(bot, context):
 def news(bot, context):
     close_keyboard(bot, context)
     keyboard_news = [['tg: Матч Премьер'], ['tg: Сборная России по футболу'],
-                     ['сайт: Чемпионат'], ['сайт: Спорт-Экспресс']]
+                     ['сайт: Чемпионат'], ['сайт: Спорт-Экспресс'],
+                     ["Назад"]]
     markup_news = ReplyKeyboardMarkup(keyboard_news, one_time_keyboard=True)
 
     bot.message.reply_text(
@@ -61,7 +59,7 @@ def news(bot, context):
 
 def get_last_news(bot, context):
     smi = ['tg: Матч Премьер', 'tg: Сборная России по футболу', 'сайт: Чемпионат',
-           'сайт: Спорт-Экспресс']
+           'сайт: Спорт-Экспресс', 'Назад']
     if bot.message.text in smi:
         smi_link = open('news.txt', 'r', encoding='utf-8').readlines()
         bot.message.reply_text(f"Ссылка: {smi_link[smi.index(bot.message.text)]}")
